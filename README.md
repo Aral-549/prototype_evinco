@@ -5,7 +5,7 @@ An automated marine forensic intelligence platform that detects oil slicks from 
 
 ---
 
-## 1. What This Project Is (In Plain English)
+## 1. What This Project Is 
 
 Commercial cargo vessels and crude tankers often wash their fuel tanks or illegally dump toxic oily bilge water into the ocean at night to avoid costly port disposal fees. 
 
