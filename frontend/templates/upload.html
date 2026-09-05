@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row mb-5">
+    <div class="col-md-8 mx-auto">
+        <div class="card shadow-sm">
+            <div class="card-header bg-secondary text-white">
+                <h4 class="mb-0">Analyze SAR Image</h4>
+            </div>
+            <div class="card-body">
+                <form id="uploadForm" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="image" class="form-label">Upload SAR Image</label>
+                        <input class="form-control bg-dark text-white border-secondary" type="file" id="image" name="image" accept="image/*" required>
+                    </div>
+                    
+                    <p>
+                        <button class="btn btn-outline-light" type="button" data-bs-toggle="collapse" data-bs-target="#advancedSettings" aria-expanded="false" aria-controls="advancedSettings">
+                            Advanced Settings
+                        </button>
+                    </p>
+                    <div class="collapse mb-3" id="advancedSettings">
+                        <div class="card card-body bg-dark border-secondary">
+                            <div class="row">
+                                <div class="col-md-6 mb-2">
+                                    <label class="form-label">Wind Speed (m/s)</label>
+                                    <input type="number" step="0.1" class="form-control bg-dark text-white border-secondary" name="wind_speed_mps" value="5.0">
+                                </div>
+                                <div class="col-md-6 mb-2">
+                                    <label class="form-label">Wind Direction (deg)</label>
+                                    <input type="number" step="0.1" class="form-control bg-dark text-white border-secondary" name="wind_direction_deg" value="180.0">
+                                </div>
+                                <div class="col-md-6 mb-2">
+                                    <label class="form-label">Current Speed (m/s)</label>
+                                    <input type="number" step="0.1" class="form-control bg-dark text-white border-secondary" name="current_speed_mps" value="0.3">
+                                </div>
+                                <div class="col-md-6 mb-2">
+                                    <label class="form-label">Current Direction (deg)</label>
+                                    <input type="number" step="0.1" class="form-control bg-dark text-white border-secondary" name="current_direction_deg" value="90.0">
+                                </div>
+                                <div class="col-md-6 mb-2">
+                                    <label class="form-label">Drift Duration (hours)</label>
+                                    <input type="number" step="0.1" class="form-control bg-dark text-white border-secondary" name="drift_duration_hours" value="24.0">
+                                </div>
+                                <div class="col-md-6 mb-2">
+                                    <label class="form-label">Detection Time</label>
+                                    <input type="datetime-local" class="form-control bg-dark text-white border-secondary" name="detection_time">
+                                </div>
+                                <div class="col-12 mt-2 mb-1">
+                                    <hr class="border-secondary">
+                                    <span class="text-info fw-bold small d-block mb-1">&bull; Geospatial Bounding Box (Layer 3 Gate):</span>
+                                    <small class="text-muted d-block mb-2">Auto-extracted if uploading a GeoTIFF. For standard PNG/JPGs, enter coordinates below to enable drift hindcasting &amp; AIS attribution. If left blank, detection will run but vessel attribution will be gated to prevent false accusations.</small>
+                                </div>
+                                <div class="col-md-3 mb-2">
+                                    <label class="form-label small">Min Lon (West)</label>
+                                    <input type="number" step="0.0001" class="form-control form-control-sm bg-dark text-white border-secondary" name="bbox_min_lon" placeholder="e.g. 71.5">
+                                </div>
+                                <div class="col-md-3 mb-2">
+                                    <label class="form-label small">Min Lat (South)</label>
+                                    <input type="number" step="0.0001" class="form-control form-control-sm bg-dark text-white border-secondary" name="bbox_min_lat" placeholder="e.g. 18.5">
+                                </div>
+                                <div class="col-md-3 mb-2">
+                                    <label class="form-label small">Max Lon (East)</label>
+                                    <input type="number" step="0.0001" class="form-control form-control-sm bg-dark text-white border-secondary" name="bbox_max_lon" placeholder="e.g. 72.5">
+                                </div>
+                                <div class="col-md-3 mb-2">
+                                    <label class="form-label small">Max Lat (North)</label>
+                                    <input type="number" step="0.0001" class="form-control form-control-sm bg-dark text-white border-secondary" name="bbox_max_lat" placeholder="e.g. 19.5">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100" id="submitBtn">
+                        <span id="btnText">Analyze Image</span>
+                        <span id="btnSpinner" class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-10 mx-auto">
+        <h5 class="mb-3">Recent Runs</h5>
+        <div class="table-responsive">
+            <table class="table table-dark table-striped">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Status</th>
+                        <th>Created At</th>
+                        <th>Spills Detected</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for run in recent_runs %}
+                    <tr>
+                        <td>{{ run.id }}</td>
+                        <td>
+                            {% if run.status == 'completed' %}
+                                <span class="badge bg-success">Completed</span>
+                            {% elif run.status == 'failed' %}
+                                <span class="badge bg-danger">Failed</span>
+                            {% else %}
+                                <span class="badge bg-warning text-dark">{{ run.status }}</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ run.created_at|date:"Y-m-d H:i" }}</td>
+                        <td>{{ run.spills_detected }}</td>
+                        <td><a href="/results/{{ run.id }}/" class="btn btn-sm btn-info">View Results</a></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Get CSRF token from cookie
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    document.getElementById('uploadForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const formData = new FormData(this);
+        const submitBtn = document.getElementById('submitBtn');
+        const btnText = document.getElementById('btnText');
+        const btnSpinner = document.getElementById('btnSpinner');
+
+        submitBtn.disabled = true;
+        btnText.innerText = 'Processing...';
+        btnSpinner.classList.remove('d-none');
+
+        const csrfToken = getCookie('csrftoken');
+        const headers = {};
+        if (csrfToken) {
+            headers['X-CSRFToken'] = csrfToken;
+        }
+
+        fetch('/api/v1/pipeline/run/', {
+            method: 'POST',
+            body: formData,
+            headers: headers
+        })
+        .then(response => {
+            return response.json().then(data => {
+                if (!response.ok) {
+                    // Show the server's error message if available
+                    const errMsg = data.error_message || data.detail || JSON.stringify(data);
+                    throw new Error(errMsg);
+                }
+                return data;
+            });
+        })
+        .then(data => {
+            if (data.status === 'failed') {
+                throw new Error(data.error_message || 'Pipeline failed');
+            }
+            window.location.href = '/results/' + data.id + '/';
+        })
+        .catch(error => {
+            alert('Error: ' + error.message);
+            submitBtn.disabled = false;
+            btnText.innerText = 'Analyze Image';
+            btnSpinner.classList.add('d-none');
+        });
+    });
+</script>
+{% endblock %}

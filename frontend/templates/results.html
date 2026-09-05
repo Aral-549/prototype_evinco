@@ -1,0 +1,344 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3>Analysis Results</h3>
+    <a href="/" class="btn btn-outline-light btn-sm">&larr; Analyze Another Image</a>
+</div>
+
+<div class="row mb-3">
+    <div class="col-12">
+        {% if run.status == 'completed' %}
+            {% if not run.is_georeferenced or run.stage == 'georeference_gated' %}
+                <div class="alert alert-warning shadow-sm mb-0">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <strong>&bull; Layer 3 Georeference Gate Active (Attribution Halted)</strong>
+                        <span class="badge bg-warning text-dark">Un-georeferenced Scene</span>
+                    </div>
+                    <small class="d-block">
+                        The AI segmentation mask was extracted from the uploaded scene, but this image does not have verified geographic coordinates (GeoTIFF tags or manual bounding box).
+                        <strong>Hydrodynamic drift modeling and AIS vessel correlation are strictly gated</strong> to prevent false or unverified accusations against maritime vessels.
+                    </small>
+                </div>
+            {% else %}
+                <div class="alert alert-success d-flex align-items-center mb-0 shadow-sm">
+                    <div>
+                        <strong>Pipeline Completed Successfully!</strong> (Run ID: <code>{{ run.id }}</code>)<br>
+                        <small class="text-muted">Inference: {{ run.detection_job.processing_time_ms|default:"N/A" }} ms | Spills identified: {{ run.spills_detected }} | Suspect vessels scored: {{ run.suspects_ranked }}</small>
+                    </div>
+                </div>
+            {% endif %}
+        {% elif run.status == 'failed' %}
+            <div class="alert alert-danger shadow-sm mb-0">
+                <strong>Pipeline Execution Halted!</strong><br>
+                <code>{{ run.error_message }}</code>
+            </div>
+        {% else %}
+            <div class="alert alert-warning d-flex align-items-center shadow-sm mb-0">
+                <div class="spinner-border text-dark me-3" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <div>
+                    <strong>Processing in progress... Stage: {{ run.stage|default:run.status }}</strong><br>
+                    <small>Auto-refreshing every 3 seconds...</small>
+                </div>
+            </div>
+            <script>
+                setTimeout(function() {
+                    location.reload();
+                }, 3000);
+            </script>
+        {% endif %}
+    </div>
+</div>
+
+{% if run.status == 'completed' %}
+<!-- Image Comparison Row -->
+<div class="row mb-4">
+    <div class="col-md-6 mb-3 mb-md-0">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">Uploaded SAR Scene</h6>
+                <small>{{ run.detection_job.image_width }} &times; {{ run.detection_job.image_height }} px</small>
+            </div>
+            <div class="card-body p-2 text-center bg-black d-flex align-items-center justify-content-center" style="min-height: 260px;">
+                {% if run.detection_job.uploaded_image %}
+                    <img src="{{ run.detection_job.uploaded_image.url }}" alt="SAR Input" class="img-fluid rounded border border-secondary" style="max-height: 380px; object-fit: contain;">
+                {% else %}
+                    <span class="text-muted">Image preview unavailable</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">AI Segmentation Mask (UNet dice: 0.8018)</h6>
+                <span class="badge {% if run.spills_detected > 0 %}bg-danger{% else %}bg-secondary{% endif %}">
+                    {% if run.spills_detected > 0 %}{{ run.spills_detected }} Slick Region(s){% else %}Clean Sea Surface{% endif %}
+                </span>
+            </div>
+            <div class="card-body p-2 text-center bg-black d-flex align-items-center justify-content-center" style="min-height: 260px;">
+                {% if run.detection_job.result_mask %}
+                    <img src="{{ run.detection_job.result_mask.url }}" alt="Spill Mask" class="img-fluid rounded border border-danger" style="max-height: 380px; object-fit: contain; filter: drop-shadow(0 0 8px rgba(255, 0, 0, 0.4));">
+                {% else %}
+                    <span class="text-muted">No mask generated</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Map Visualization Row -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card shadow-sm">
+            <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Maritime GIS Map &amp; Drift Trajectory</h5>
+                {% if run.is_georeferenced and run.stage != 'georeference_gated' %}
+                <div>
+                    <span class="badge bg-danger me-1">&block; Slick</span>
+                    <span class="badge bg-warning text-dark me-1">&bull; Est. Origin</span>
+                    <span class="badge bg-primary me-1">&mdash; Hindcast</span>
+                    <span class="badge bg-success">&mdash; Forecast</span>
+                </div>
+                {% endif %}
+            </div>
+            <div class="card-body p-0">
+                {% if run.is_georeferenced and run.stage != 'georeference_gated' %}
+                    <div id="map" style="height: 520px; width: 100%;"></div>
+                {% else %}
+                    <div class="text-center py-5 text-muted bg-dark" style="min-height: 250px;">
+                        <h5 class="text-warning mb-2">&bull; GIS Projection Disabled</h5>
+                        <p class="mb-2">This scene is not georeferenced to geographic coordinates.</p>
+                        <small class="d-block text-secondary">To view slicks on navigational charts and correlate with AIS vessel traffic, provide a GeoTIFF or enter bounding coordinates in Advanced Settings.</small>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Details & Suspect Table -->
+<div class="row mb-4">
+    <div class="col-md-4 mb-3 mb-md-0">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0">Meteocean &amp; Detection Parameters</h5>
+            </div>
+            <div class="card-body">
+                <ul class="list-group list-group-flush bg-transparent">
+                    <li class="list-group-item bg-transparent text-white d-flex justify-content-between">
+                        <span>Spills Detected:</span>
+                        <strong class="{% if run.spills_detected > 0 %}text-danger{% else %}text-muted{% endif %}">{{ run.spills_detected }}</strong>
+                    </li>
+                    <li class="list-group-item bg-transparent text-white d-flex justify-content-between">
+                        <span>Georeferenced:</span>
+                        <span class="badge {% if run.is_georeferenced %}bg-success{% else %}bg-warning text-dark{% endif %}">
+                            {% if run.is_georeferenced %}Verified WGS-84{% else %}Unanchored (Gated){% endif %}
+                        </span>
+                    </li>
+                    <li class="list-group-item bg-transparent text-white d-flex justify-content-between">
+                        <span>Suspects Ranked:</span>
+                        <strong>{{ run.suspects_ranked }}</strong>
+                    </li>
+                    <li class="list-group-item bg-transparent text-white d-flex justify-content-between">
+                        <span>Wind Vector:</span>
+                        <span>{{ run.wind_speed_mps }} m/s @ {{ run.wind_direction_deg }}&deg;</span>
+                    </li>
+                    <li class="list-group-item bg-transparent text-white d-flex justify-content-between">
+                        <span>Surface Current:</span>
+                        <span>{{ run.current_speed_mps }} m/s @ {{ run.current_direction_deg }}&deg;</span>
+                    </li>
+                    <li class="list-group-item bg-transparent text-white d-flex justify-content-between align-items-center">
+                        <span>Met-Ocean Source:</span>
+                        {% if run.metocean_source == 'open-meteo' %}
+                            <span class="badge bg-info text-dark" title="Retrieved live from Open-Meteo ECMWF reanalysis">Live ECMWF (Open-Meteo)</span>
+                        {% elif run.metocean_source == 'manual_override' %}
+                            <span class="badge bg-primary" title="Supplied directly by operator in manual input">Manual Operator Input</span>
+                        {% else %}
+                            <span class="badge bg-secondary" title="Standard climatological values applied (offline fallback)">Standard Maritime Fallback</span>
+                        {% endif %}
+                    </li>
+                    <li class="list-group-item bg-transparent text-white d-flex justify-content-between">
+                        <span>Drift Duration:</span>
+                        <span>{{ run.drift_duration_hours }} hours</span>
+                    </li>
+                    <li class="list-group-item bg-transparent text-white d-flex justify-content-between">
+                        <span>Inference Engine:</span>
+                        <span>{{ model_info.name|default:"UNet" }}{% if model_info.dice_score %} (Dice {{ model_info.dice_score }}){% endif %}</span>
+                    </li>
+                    {% if run.stage_durations %}
+                    <li class="list-group-item bg-transparent text-white pt-3">
+                        <span class="text-info d-block fw-bold mb-1">Async Celery Stage Breakdown:</span>
+                        <div class="d-flex justify-content-between small text-muted">
+                            <span>1. Detection:</span>
+                            <span class="text-white">{{ run.stage_durations.detection|default:"0" }} ms</span>
+                        </div>
+                        <div class="d-flex justify-content-between small text-muted">
+                            <span>2. Drift Hindcast:</span>
+                            <span class="text-white">{{ run.stage_durations.drift|default:"0" }} ms</span>
+                        </div>
+                        <div class="d-flex justify-content-between small text-muted">
+                            <span>3. AIS Scoring:</span>
+                            <span class="text-white">{{ run.stage_durations.ais_attribution|default:"0" }} ms</span>
+                        </div>
+                    </li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-8">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">AIS Correlated Suspect Vessels</h5>
+                <small>Ranked by spatio-temporal suspicion</small>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover table-striped mb-0">
+                        <thead>
+                            <tr>
+                                <th>Rank</th>
+                                <th>MMSI</th>
+                                <th>Name</th>
+                                <th>Type</th>
+                                <th>Composite Score</th>
+                                <th>Min Distance</th>
+                                <th>Anomalies</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if not run.is_georeferenced or run.stage == 'georeference_gated' %}
+                            <tr>
+                                <td colspan="7" class="text-center py-4 text-warning">
+                                    <em>&bull; Attribution Gated: Vessel correlation disabled because scene has no physical geographic coordinates.</em>
+                                </td>
+                            </tr>
+                            {% else %}
+                                {% for suspect in suspects %}
+                                <tr>
+                                    <td><span class="badge {% if forloop.first %}bg-danger{% else %}bg-secondary{% endif %}">#{{ suspect.rank }}</span></td>
+                                    <td><code>{{ suspect.mmsi }}</code></td>
+                                    <td>{{ suspect.vessel_name|default:"Unknown" }}</td>
+                                    <td>{{ suspect.vessel_type|default:"Cargo/Tanker" }}</td>
+                                    <td><strong>{{ suspect.composite_score }}</strong></td>
+                                    <td>{{ suspect.min_distance_km }} km</td>
+                                    <td>
+                                        {% if suspect.anomalies %}
+                                            {% for anom in suspect.anomalies %}
+                                                <span class="badge bg-warning text-dark me-1">{{ anom }}</span>
+                                            {% endfor %}
+                                        {% else %}
+                                            <span class="badge bg-secondary">None</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="7" class="text-center py-4 text-muted">
+                                        <em>No AIS traffic found in the hindcasted origin window.</em>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if run.status == 'completed' and run.is_georeferenced and run.stage != 'georeference_gated' %}
+{{ spill_regions_data|json_script:"spillData" }}
+{{ drift_results_data|json_script:"driftData" }}
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const spillData = JSON.parse(document.getElementById('spillData').textContent || '[]');
+        const driftData = JSON.parse(document.getElementById('driftData').textContent || '[]');
+
+        let initialCenter = [19.0, 72.0];
+        if (spillData.length > 0 && spillData[0].centroid_lat != null) {
+            initialCenter = [spillData[0].centroid_lat, spillData[0].centroid_lon];
+        }
+
+        const map = L.map('map').setView(initialCenter, 9);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 18,
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+
+        const bounds = [];
+
+        // Plot spills
+        spillData.forEach(spill => {
+            if (spill.polygon_geojson && spill.centroid_lat != null) {
+                const geoLayer = L.geoJSON(spill.polygon_geojson, {
+                    style: {
+                        color: '#dc3545',
+                        weight: 2,
+                        fillColor: '#e63946',
+                        fillOpacity: 0.55
+                    }
+                }).bindPopup(`<b>Detected Oil Spill #${spill.id}</b><br>Area: ${spill.area_sq_km ? spill.area_sq_km.toFixed(2) : 'N/A'} km²<br>Confidence: ${(spill.confidence * 100).toFixed(1)}%`);
+                geoLayer.addTo(map);
+            }
+
+            if (spill.centroid_lat != null && spill.centroid_lon != null) {
+                bounds.push([spill.centroid_lat, spill.centroid_lon]);
+                L.circleMarker([spill.centroid_lat, spill.centroid_lon], {
+                    radius: 5,
+                    color: '#dc3545',
+                    fillColor: '#ffffff',
+                    fillOpacity: 1
+                }).addTo(map).bindPopup(`<b>Slick Centroid</b><br>Lat: ${spill.centroid_lat.toFixed(4)}<br>Lon: ${spill.centroid_lon.toFixed(4)}`);
+            }
+        });
+
+        // Plot drift results
+        driftData.forEach(drift => {
+            if (drift.origin_lat != null && drift.origin_lon != null) {
+                bounds.push([drift.origin_lat, drift.origin_lon]);
+                L.circleMarker([drift.origin_lat, drift.origin_lon], {
+                    color: '#fd7e14',
+                    fillColor: '#ffc107',
+                    radius: 7,
+                    weight: 2,
+                    fillOpacity: 0.95
+                }).addTo(map).bindPopup(`<b>Estimated Origin Location</b><br>Lat: ${drift.origin_lat.toFixed(4)}<br>Lon: ${drift.origin_lon.toFixed(4)}<br>Time: ${drift.origin_time || 'N/A'}<br>Uncertainty: &plusmn;${drift.origin_uncertainty_km} km`);
+            }
+
+            if (drift.hindcast_trajectory && drift.hindcast_trajectory.length > 0) {
+                const hindcastCoords = drift.hindcast_trajectory.map(p => [p.lat, p.lon]);
+                hindcastCoords.forEach(pt => bounds.push(pt));
+                L.polyline(hindcastCoords, {
+                    color: '#0d6efd',
+                    weight: 3,
+                    dashArray: '8, 8'
+                }).addTo(map).bindPopup("<b>Hindcast Trajectory</b> (Estimated drift from origin to detection)");
+            }
+
+            if (drift.forecast_trajectory && drift.forecast_trajectory.length > 0) {
+                const forecastCoords = drift.forecast_trajectory.map(p => [p.lat, p.lon]);
+                forecastCoords.forEach(pt => bounds.push(pt));
+                L.polyline(forecastCoords, {
+                    color: '#198754',
+                    weight: 3,
+                    dashArray: '8, 8'
+                }).addTo(map).bindPopup("<b>Forecast Trajectory</b> (Projected future slick dispersion)");
+            }
+        });
+
+        if (bounds.length > 0) {
+            map.fitBounds(bounds, {padding: [50, 50], maxZoom: 12});
+        }
+    });
+</script>
+{% endif %}
+{% endblock %}

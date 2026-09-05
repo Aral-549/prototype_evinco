@@ -1,0 +1,33 @@
+# Core Django & REST Framework
+Django>=5.0
+djangorestframework>=3.15
+drf-spectacular>=0.27
+django-cors-headers>=4.3
+
+# Asynchronous Task Processing & Caching
+celery>=5.3
+redis>=5.0
+
+# Computer Vision & Geospatial
+Pillow>=10.0
+opencv-python-headless>=4.8
+shapely>=2.0
+geojson>=3.0
+
+# Scientific & HTTP
+numpy>=1.26
+pandas>=2.0
+scipy>=1.11
+requests>=2.31
+
+# Deep Learning & Segmentation
+torch>=2.0
+torchvision>=0.15
+segmentation-models-pytorch>=0.3.4
+timm>=1.0.0
+safetensors>=0.4.0
+
+# Testing & Quality
+pytest>=8.0
+pytest-django>=4.8
+

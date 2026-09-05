@@ -1,0 +1,56 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Django
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+.env
+backend/.env
+
+# Uploaded Media (Preserve directories, ignore uploaded files)
+backend/media/uploads/*
+!backend/media/uploads/.gitkeep
+backend/media/results/*
+!backend/media/results/.gitkeep
+
+# Pytest / Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Large Binary Model Checkpoints (>100MB exceed GitHub push limit)
+# The repository tracks split parts (.part_*) which are <60MB each.
+ai_model/weights/**/best_unet
+!ai_model/weights/**/best_unet.part_*
+
+# IDEs & System
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
