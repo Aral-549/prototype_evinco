@@ -18,15 +18,20 @@ class JSONFormatter(logging.Formatter):
             'duration_ms': getattr(record, 'duration_ms', None),
         }
 
-        # Include custom extra metadata if present
-        for key in ('stage_event', 'spills_count', 'suspects_count', 'error'):
+        # Include custom extra metadata if present. stage_inputs/stage_outputs are
+        # what make a scattered bug traceable to one stage rather than "somewhere in
+        # the pipeline": each boundary records what it received and what it emitted.
+        for key in ('stage_event', 'spills_count', 'suspects_count', 'error',
+                    'stage_inputs', 'stage_outputs'):
             if hasattr(record, key):
                 log_entry[key] = getattr(record, key)
 
         if record.exc_info:
             log_entry['exception'] = self.formatException(record.exc_info)
 
-        return json.dumps(log_entry)
+        # A log line must never crash the run that emitted it: a value that is not
+        # JSON-serialisable falls back to its repr rather than raising.
+        return json.dumps(log_entry, default=repr)
 
 
 class PipelineLogger:

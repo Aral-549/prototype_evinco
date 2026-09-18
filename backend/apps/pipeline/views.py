@@ -27,7 +27,12 @@ class PipelineRunView(APIView):
         data = serializer.validated_data
         image_file = data['image']
 
+        submitter = getattr(request.user, 'label', '') or ''
+        fingerprint = getattr(request.user, 'fingerprint', '') or ''
+
         pipeline_run = PipelineRun.objects.create(
+            submitted_by=submitter,
+            submitted_by_fingerprint=fingerprint,
             wind_speed_mps=data.get('wind_speed_mps', 5.0),
             wind_direction_deg=data.get('wind_direction_deg', 180.0),
             current_speed_mps=data.get('current_speed_mps', 0.3),

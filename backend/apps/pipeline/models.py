@@ -38,6 +38,22 @@ class PipelineRun(models.Model):
     bbox_min_lat = models.FloatField(null=True, blank=True)
     bbox_max_lon = models.FloatField(null=True, blank=True)
     bbox_max_lat = models.FloatField(null=True, blank=True)
+    # Forensic chain of custody (apps/pipeline/evidence.py)
+    evidence_manifest = models.JSONField(default=dict, blank=True)
+    manifest_sha256 = models.CharField(max_length=64, blank=True, default='', db_index=True)
+    # Case-level attribution conclusion, including the explicit
+    # "source is not in this AIS data" hypothesis.
+    attribution_summary = models.JSONField(default=dict, blank=True)
+    unknown_vessel_posterior = models.FloatField(null=True, blank=True)
+    regions_rejected_as_lookalike = models.IntegerField(default=0)
+    # Adversarial self-audit: how the conclusion holds up when the assumptions it
+    # rests on are varied across their defensible ranges.
+    robustness_report = models.JSONField(default=dict, blank=True)
+    # Who submitted this scene. The label is the API key's name; the fingerprint is a
+    # digest, never the key itself, so a leaked dossier cannot leak the credential
+    # that produced it.
+    submitted_by = models.CharField(max_length=64, blank=True, default='')
+    submitted_by_fingerprint = models.CharField(max_length=64, blank=True, default='')
 
     class Meta:
         ordering = ['-created_at']
