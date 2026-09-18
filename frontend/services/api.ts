@@ -33,13 +33,18 @@ function authHeaders(): Record<string, string> {
 
 export const API_BASE = isServer
   ? (process.env.BACKEND_ORIGIN ?? "http://127.0.0.1:8000")
-  // Browser-side: route through /api/proxy, which runs in the Next process and
-  // attaches the key there. A key shipped to the browser is not a secret.
-  : "/api/proxy";
+  // Browser-side: route through /proxy, which runs in the Next process and
+  // attaches the key there. Avoids collisions with /api/ rewrite rules and Nginx.
+  : "/proxy";
 
-/** Server talks to Django's /api/... ; browser talks to this app's /api/proxy/... */
-function base() {
-  return isServer ? `${API_BASE}/api` : API_BASE;
+/**
+ * Builds the appropriate target URL:
+ * - Server Components call Django directly on port 8000 (requires trailing slash)
+ * - Browser components call Next.js /proxy (Next.js prefers no trailing slash to avoid 308 redirect)
+ */
+function endpoint(path: string): string {
+  const clean = path.replace(/^\/+|\/+$/g, "");
+  return isServer ? `${API_BASE}/api/${clean}/` : `${API_BASE}/${clean}`;
 }
 
 export class ApiError extends Error {
@@ -115,7 +120,7 @@ export async function submitAnalysis(opts: SubmitOptions): Promise<{ id: string 
     if (v !== undefined && v !== "") form.append(k, v);
   }
 
-  const res = await fetch(`${base()}/v1/pipeline/run/`, {
+  const res = await fetch(endpoint("v1/pipeline/run"), {
     method: "POST",
     body: form,
     headers: authHeaders(),
@@ -139,7 +144,7 @@ export async function submitAnalysis(opts: SubmitOptions): Promise<{ id: string 
 }
 
 export async function getStatus(id: string): Promise<RunStatus> {
-  const res = await fetch(`${base()}/v1/pipeline/${id}/status/`, {
+  const res = await fetch(endpoint(`v1/pipeline/${id}/status`), {
     cache: "no-store",
     headers: authHeaders(),
   });
@@ -148,7 +153,7 @@ export async function getStatus(id: string): Promise<RunStatus> {
 }
 
 export async function getDossier(id: string): Promise<Dossier> {
-  const res = await fetch(`${base()}/v1/pipeline/${id}/dossier/`, {
+  const res = await fetch(endpoint(`v1/pipeline/${id}/dossier`), {
     cache: "no-store",
     headers: authHeaders(),
   });
@@ -162,7 +167,7 @@ export async function getDossier(id: string): Promise<Dossier> {
 }
 
 export async function getRecentRuns(limit = 8): Promise<RunSummary[]> {
-  const res = await fetch(`${base()}/v1/pipeline/runs/?limit=${limit}`, {
+  const res = await fetch(`${endpoint("v1/pipeline/runs")}?limit=${limit}`, {
     cache: "no-store",
     headers: authHeaders(),
   });

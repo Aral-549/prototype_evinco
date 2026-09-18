@@ -12,6 +12,7 @@ const BACKEND = process.env.BACKEND_ORIGIN ?? "http://127.0.0.1:8000";
 
 async function forward(request: NextRequest, path: string[]) {
   const joined = path.join("/");
+  // Ensure trailing slash for Django REST framework endpoints unless it's a static file with an extension
   const hasExt = path[path.length - 1]?.includes(".");
   const trailingSlash = !hasExt && !joined.endsWith("/") ? "/" : "";
   const target = `${BACKEND}/api/${joined}${trailingSlash}${request.nextUrl.search}`;
