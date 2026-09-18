@@ -1,0 +1,88 @@
+@import "tailwindcss";
+
+/*
+  DESIGN TOKENS — this is the entire "look" of the site in one place.
+  Swap these values to reskin the whole app for a new hackathon in minutes.
+  Values are OKLCH (perceptually even — safer to tweak lightness/chroma
+  without colors going muddy or clipping) instead of raw hex.
+*/
+:root {
+  --color-bg: oklch(0.15 0.02 262);       /* near-black, faint navy tint */
+  --color-bg-raised: oklch(0.19 0.022 262);
+  --color-fg: oklch(0.96 0.01 95);        /* warm off-white, not pure #fff */
+  --color-fg-muted: oklch(0.72 0.02 95);
+  --color-accent: oklch(0.8 0.16 90);     /* warm amber/gold — NOT indigo/purple */
+  --color-accent-2: oklch(0.68 0.19 25);  /* coral/red, secondary accent */
+  --color-border: oklch(0.32 0.02 262);
+
+  --font-display: var(--font-bricolage);
+  --font-body: var(--font-instrument);
+  --font-mono: var(--font-space-mono);
+}
+
+@theme inline {
+  --color-bg: var(--color-bg);
+  --color-bg-raised: var(--color-bg-raised);
+  --color-fg: var(--color-fg);
+  --color-fg-muted: var(--color-fg-muted);
+  --color-accent: var(--color-accent);
+  --color-accent-2: var(--color-accent-2);
+  --color-border: var(--color-border);
+  --font-display: var(--font-display);
+  --font-body: var(--font-body);
+  --font-mono: var(--font-mono);
+}
+
+* {
+  border-color: var(--color-border);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-body);
+}
+
+::selection {
+  background: var(--color-accent);
+  color: var(--color-bg);
+}
+
+/* Thin, branded scrollbar instead of the default browser one */
+::-webkit-scrollbar {
+  width: 10px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-bg);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 999px;
+  border: 2px solid var(--color-bg);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-fg-muted);
+}
+
+/*
+  Signature motif #1: subtle film-grain noise overlay. Cheap (pure CSS,
+  no image request) and instantly reads as "designed" instead of flat.
+  Applied via the <NoiseOverlay /> component, not globally, so it stays
+  easy to remove.
+*/
+.noise-texture {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  opacity: 0.05;
+  mix-blend-mode: overlay;
+}
+
+/* Signature motif #2: a single consistent radius language — sharp, not pill */
+.panel {
+  border-radius: 6px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-raised);
+}
