@@ -28,6 +28,8 @@ wheels/
 local_settings.py
 db.sqlite3
 db.sqlite3-journal
+staticfiles/
+backend/staticfiles/
 .env
 backend/.env
 

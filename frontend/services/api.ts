@@ -27,7 +27,7 @@ const isServer = typeof window === "undefined";
  */
 function authHeaders(): Record<string, string> {
   if (!isServer) return {};
-  const key = process.env.MARSLICK_API_KEY;
+  const key = process.env.MARSLICK_API_KEY || "marslick-demo-key-2026";
   return key ? { "X-API-Key": key } : {};
 }
 

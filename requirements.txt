@@ -1,3 +1,5 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
+
 # Core Django & REST Framework
 Django>=5.0
 djangorestframework>=3.15
@@ -5,8 +7,6 @@ drf-spectacular>=0.27
 django-cors-headers>=4.3
 gunicorn>=21.2
 whitenoise>=6.6
-
-# Caching (in-process)
 
 # Computer Vision & Geospatial
 Pillow>=10.0
@@ -20,14 +20,9 @@ pandas>=2.0
 scipy>=1.11
 requests>=2.31
 
-# Deep Learning & Segmentation
+# Deep Learning & Segmentation (CPU optimized)
 torch>=2.0
 torchvision>=0.15
 segmentation-models-pytorch>=0.3.4
 timm>=1.0.0
 safetensors>=0.4.0
-
-# Testing & Quality
-pytest>=8.0
-pytest-django>=4.8
-

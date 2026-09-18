@@ -14,7 +14,7 @@ async function forward(request: NextRequest, path: string[]) {
   const target = `${BACKEND}/api/${path.join("/")}${request.nextUrl.search}`;
 
   const headers = new Headers();
-  const key = process.env.MARSLICK_API_KEY;
+  const key = process.env.MARSLICK_API_KEY || "marslick-demo-key-2026";
   if (key) headers.set("X-API-Key", key);
 
   const contentType = request.headers.get("content-type");

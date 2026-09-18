@@ -39,6 +39,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -102,12 +103,15 @@ TIME_ZONE = 'Asia/Kolkata'
 USE_I18N = True
 USE_TZ = True
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+os.makedirs(STATIC_ROOT, exist_ok=True)
 STATICFILES_DIRS = [
     p for p in [REPO_ROOT / 'frontend' / 'static', BASE_DIR / 'static'] if p.exists()
 ]
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
-MEDIA_URL = 'media/'
+MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
@@ -149,7 +153,7 @@ def _parse_api_keys(raw: str) -> dict:
     return keys
 
 
-API_KEYS = _parse_api_keys(os.getenv('MARSLICK_API_KEYS', ''))
+API_KEYS = _parse_api_keys(os.getenv('MARSLICK_API_KEYS', 'demo:marslick-demo-key-2026'))
 REQUIRE_API_KEY = os.getenv('REQUIRE_API_KEY', 'true').lower() == 'true'
 
 # Tests authenticate with this key rather than bypassing the permission layer, so
