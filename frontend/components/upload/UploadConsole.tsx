@@ -30,6 +30,13 @@ const PRESETS = [
   { name: "Chennai offshore", box: ["80.30", "12.90", "80.80", "13.40"] },
 ];
 
+const SAMPLE_SCENES = [
+  { label: "Clear Oil Spill", file: "blob_clear.png", box: ["71.90", "18.90", "72.30", "19.30"] },
+  { label: "Discharge Trail", file: "linear_clear.png", box: ["71.90", "18.90", "72.30", "19.30"] },
+  { label: "Weathered Slick", file: "patchy_clear.png", box: ["71.90", "18.90", "72.30", "19.30"] },
+  { label: "Rough Sea Spill", file: "blob_noisy.png", box: ["71.90", "18.90", "72.30", "19.30"] },
+];
+
 export function UploadConsole() {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -67,6 +74,20 @@ export function UploadConsole() {
     if (/\.(png|jpe?g)$/i.test(f.name)) setPreview(URL.createObjectURL(f));
     else setPreview(null);
   }, []);
+
+  async function loadSample(s: (typeof SAMPLE_SCENES)[number]) {
+    setError(null);
+    try {
+      const res = await fetch(`/samples/${s.file}`);
+      if (!res.ok) throw new Error("Could not load sample file");
+      const blob = await res.blob();
+      const sampleFile = new File([blob], s.file, { type: "image/png" });
+      choose(sampleFile);
+      setBbox(s.box);
+    } catch (err) {
+      console.error("Failed to load sample SAR image:", err);
+    }
+  }
 
   async function run() {
     if (!file || busy) return;
@@ -189,6 +210,23 @@ export function UploadConsole() {
             </button>
           )}
         </div>
+
+        {/* ── Quick SAR Demo Scenes ───────────────────────── */}
+        {!busy && (
+          <div className="mt-2.5 flex flex-wrap items-center gap-1.5 text-[11px]">
+            <span className="font-mono text-[10px] uppercase tracking-wider text-fg-muted">Quick SAR Demo Scenes:</span>
+            {SAMPLE_SCENES.map((s) => (
+              <button
+                key={s.file}
+                type="button"
+                onClick={() => loadSample(s)}
+                className="rounded border border-border bg-bg-sunken px-2 py-0.5 text-fg-muted transition-colors hover:border-accent hover:text-accent"
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* ── Stage progress ──────────────────────────────── */}
         <AnimatePresence>
