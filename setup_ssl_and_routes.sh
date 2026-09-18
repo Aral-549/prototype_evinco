@@ -27,8 +27,9 @@ echo -e "${BLUE}================================================================
 echo -e "${BLUE}       Configuring Domain & HTTPS for ${DOMAIN}                   ${NC}"
 echo -e "${BLUE}==================================================================${NC}"
 
-# 1. Configure unified Nginx configuration
+# 1. Clean up any stray conf.d files and configure unified Nginx configuration
 echo -e "\n${YELLOW}[Step 1/5] Writing unified Nginx configuration...${NC}"
+rm -f /etc/nginx/conf.d/paimana_routes.conf /etc/nginx/conf.d/*paimana*
 cat <<EOF > /etc/nginx/sites-available/marslick
 server {
     listen 80;
@@ -143,8 +144,14 @@ if [[ -f "${VENV_PATH}/bin/python" ]]; then
     sudo -u "$TARGET_USER" "${VENV_PATH}/bin/python" "${PROJECT_DIR}/backend/manage.py" seed_demo --keep || true
 fi
 
-# 4. Ensure systemd service configuration has correct backend origin
-echo -e "\n${YELLOW}[Step 4/5] Updating service definitions...${NC}"
+# 4. Rebuild frontend and update systemd service configuration
+echo -e "\n${YELLOW}[Step 4/5] Building updated frontend and configuring services...${NC}"
+if [[ -d "${PROJECT_DIR}/frontend" ]]; then
+    cd "${PROJECT_DIR}/frontend"
+    sudo -u "$TARGET_USER" npm run build
+    cd "${PROJECT_DIR}"
+fi
+
 cat <<EOF > /etc/systemd/system/marslick-frontend.service
 [Unit]
 Description=MarSlick Next.js Frontend Service
