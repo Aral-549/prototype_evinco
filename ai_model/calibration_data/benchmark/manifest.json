@@ -1,0 +1,119 @@
+{
+  "suite": "synthetic_sar_benchmark",
+  "version": "1.0.0",
+  "size": 512,
+  "seed_base": 26143,
+  "scenes": [
+    {
+      "name": "linear_clear",
+      "geometry": "linear",
+      "looks": 4,
+      "damping": 0.2,
+      "has_slick": true,
+      "slick_pixels": 8848,
+      "lookalike_pixels": 6969,
+      "slick_fraction": 0.03375
+    },
+    {
+      "name": "linear_faint",
+      "geometry": "linear",
+      "looks": 4,
+      "damping": 0.45,
+      "has_slick": true,
+      "slick_pixels": 8848,
+      "lookalike_pixels": 6772,
+      "slick_fraction": 0.03375
+    },
+    {
+      "name": "linear_noisy",
+      "geometry": "linear",
+      "looks": 1,
+      "damping": 0.22,
+      "has_slick": true,
+      "slick_pixels": 8837,
+      "lookalike_pixels": 8549,
+      "slick_fraction": 0.03371
+    },
+    {
+      "name": "linear_multilook",
+      "geometry": "linear",
+      "looks": 16,
+      "damping": 0.2,
+      "has_slick": true,
+      "slick_pixels": 8833,
+      "lookalike_pixels": 6511,
+      "slick_fraction": 0.0337
+    },
+    {
+      "name": "patchy_clear",
+      "geometry": "patchy",
+      "looks": 4,
+      "damping": 0.22,
+      "has_slick": true,
+      "slick_pixels": 10734,
+      "lookalike_pixels": 12337,
+      "slick_fraction": 0.04095
+    },
+    {
+      "name": "patchy_faint",
+      "geometry": "patchy",
+      "looks": 4,
+      "damping": 0.48,
+      "has_slick": true,
+      "slick_pixels": 10151,
+      "lookalike_pixels": 6046,
+      "slick_fraction": 0.03872
+    },
+    {
+      "name": "blob_clear",
+      "geometry": "blob",
+      "looks": 4,
+      "damping": 0.2,
+      "has_slick": true,
+      "slick_pixels": 12729,
+      "lookalike_pixels": 16811,
+      "slick_fraction": 0.04856
+    },
+    {
+      "name": "blob_noisy",
+      "geometry": "blob",
+      "looks": 2,
+      "damping": 0.24,
+      "has_slick": true,
+      "slick_pixels": 12729,
+      "lookalike_pixels": 7565,
+      "slick_fraction": 0.04856
+    },
+    {
+      "name": "clean_water_calm",
+      "geometry": "none",
+      "looks": 4,
+      "damping": 0.22,
+      "has_slick": false,
+      "slick_pixels": 0,
+      "lookalike_pixels": 21951,
+      "slick_fraction": 0.0
+    },
+    {
+      "name": "clean_water_rough",
+      "geometry": "none",
+      "looks": 1,
+      "damping": 0.3,
+      "has_slick": false,
+      "slick_pixels": 0,
+      "lookalike_pixels": 12337,
+      "slick_fraction": 0.0
+    },
+    {
+      "name": "clean_water_plain",
+      "geometry": "none",
+      "looks": 8,
+      "damping": 1.0,
+      "has_slick": false,
+      "slick_pixels": 0,
+      "lookalike_pixels": 0,
+      "slick_fraction": 0.0
+    }
+  ],
+  "caveat": "Synthetic. Speckle statistics, the incidence gradient and the damping physics are faithful; this is not Sentinel-1 data. Use it to RANK checkpoints under identical conditions, never to quote absolute real-world performance."
+}

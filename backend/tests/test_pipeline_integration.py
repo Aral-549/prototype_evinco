@@ -11,6 +11,7 @@ from apps.pipeline.models import PipelineRun
 def test_full_pipeline_sync_execution():
     """Integration Test: POST image to pipeline with sync=true -> assert completed status."""
     client = APIClient()
+    client.credentials(HTTP_X_API_KEY='test-key-not-for-production')
 
     # Create synthetic test SAR image with realistic speckle noise (256x256)
     np.random.seed(42)

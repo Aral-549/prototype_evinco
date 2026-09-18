@@ -6,6 +6,34 @@ from rest_framework.test import APIClient
 from apps.detection.preprocessing import validate_sar_characteristics, load_image
 
 
+def speckled_sar_with_slick(size=256, seed=42):
+    """A SAR-like scene containing a genuinely damped slick.
+
+    The fixtures here previously used `np.random.normal(120, 25, ...)` with a flat
+    dark square stamped into it. That is additive noise with a painted-on patch,
+    and once Layer 2 look-alike screening was added the patch was correctly
+    rejected: its speckle statistics were identical to the surrounding "sea", which
+    is the signature of a calm zone rather than oil. These tests are about the
+    georeference gate and met-ocean plumbing, not about detection, so the fixture is
+    now a scene that actually contains a slick: multiplicative gamma speckle, with a
+    region damped in BOTH mean and speckle variance, as mineral oil is.
+    """
+    rng = np.random.default_rng(seed)
+    yy, xx = np.mgrid[0:size, 0:size]
+    sigma0 = 0.55 - 0.10 * (xx / size)
+
+    slick = np.zeros((size, size), bool)
+    slick[90:170, 60:200] = True
+
+    sigma0 = np.where(slick, sigma0 * 0.20, sigma0)
+    looks = np.where(slick, 64.0, 4.0)          # oil damps speckle as well as mean
+    amplitude = np.sqrt(sigma0 * rng.gamma(shape=looks, scale=1.0 / looks))
+
+    img = np.clip(amplitude / np.percentile(amplitude, 99.5), 0, 1)
+    base = (img * 255).astype(np.uint8)
+    return np.stack([base, base, base], axis=-1)
+
+
 def test_layer1_ood_rejection_for_optical_and_screenshot():
     """Verify Layer 1 rejects optical color photos and screenshot-like flat blocks."""
     # 1. Optical RGB photo (uncorrelated channels)
@@ -41,12 +69,10 @@ def test_layer1_sar_acceptance():
 def test_layer3_georeference_gate_unanchored():
     """Verify unanchored images halt at Layer 3 without running drift or AIS attribution."""
     client = APIClient()
+    client.credentials(HTTP_X_API_KEY='test-key-not-for-production')
 
     # Create synthetic SAR image
-    np.random.seed(42)
-    base = np.random.normal(120, 25, (256, 256)).clip(0, 255).astype(np.uint8)
-    base[100:150, 100:150] = 10  # spill anomaly
-    arr = np.stack([base, base, base], axis=-1)
+    arr = speckled_sar_with_slick()
 
     with tempfile.NamedTemporaryFile(suffix='.png') as tmp:
         Image.fromarray(arr).save(tmp.name)
@@ -70,12 +96,10 @@ def test_layer3_georeference_gate_unanchored():
 def test_layer3_georeferenced_with_explicit_bbox():
     """Verify explicitly bounded images pass Layer 3 and proceed to drift hindcast."""
     client = APIClient()
+    client.credentials(HTTP_X_API_KEY='test-key-not-for-production')
 
     # Create synthetic SAR image
-    np.random.seed(42)
-    base = np.random.normal(120, 25, (256, 256)).clip(0, 255).astype(np.uint8)
-    base[100:150, 100:150] = 10  # spill anomaly
-    arr = np.stack([base, base, base], axis=-1)
+    arr = speckled_sar_with_slick()
 
     with tempfile.NamedTemporaryFile(suffix='.png') as tmp:
         Image.fromarray(arr).save(tmp.name)
@@ -105,11 +129,9 @@ def test_layer3_georeferenced_with_explicit_bbox():
 def test_metocean_source_manual_override():
     """Verify operator manual wind/current parameters are tagged as manual_override."""
     client = APIClient()
+    client.credentials(HTTP_X_API_KEY='test-key-not-for-production')
 
-    np.random.seed(42)
-    base = np.random.normal(120, 25, (256, 256)).clip(0, 255).astype(np.uint8)
-    base[100:150, 100:150] = 10
-    arr = np.stack([base, base, base], axis=-1)
+    arr = speckled_sar_with_slick()
 
     with tempfile.NamedTemporaryFile(suffix='.png') as tmp:
         Image.fromarray(arr).save(tmp.name)

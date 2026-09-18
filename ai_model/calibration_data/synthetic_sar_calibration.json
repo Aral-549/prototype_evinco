@@ -1,0 +1,15 @@
+{
+  "name": "synthetic_sar_calibration",
+  "kind": "synthetic",
+  "seed": 26143,
+  "looks": 4,
+  "size": [
+    768,
+    768
+  ],
+  "slick_pixels": 14767,
+  "slick_fraction": 0.02504,
+  "lookalike_pixels": 18475,
+  "ground_truth_mask": "synthetic_sar_calibration_truth.png",
+  "caveat": "Synthetic. Speckle statistics, the incidence gradient and the damping behaviour are physically faithful, but this is not a real Sentinel-1 scene and must never be cited as detection performance on real imagery. It exists so the validation gate has a positive control with a known answer."
+}

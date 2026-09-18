@@ -6,7 +6,8 @@ Run this script before switching to a new model checkpoint to verify:
 2. Input/Output tensor contracts are strictly satisfied
 3. Forward pass produces valid probabilities (no NaNs/Infs)
 4. Tiled full-image inference runs seamlessly with polygon extraction
-5. Side-by-side behavioral comparison against baseline model on real SAR calibration imagery
+5. Side-by-side behavioral comparison against baseline, on a calibration asset
+   that is itself verified to be admissible SAR imagery before it is used
 6. Gating rules: Fail only on zero-spill drop or latency blowup (IoU/Dice is informational)
 
 Usage:
@@ -161,13 +162,42 @@ def validate_checkpoint(checkpoint_path: str) -> bool:
         print(f"[FAIL] Tiled inference failed: {e}")
         return False
 
-    # 5. Side-by-Side Calibration Comparison vs Baseline on Real SAR
+    # 5. Side-by-Side Calibration Comparison vs Baseline
+    #
+    # The calibration asset is itself validated before use. It previously was not,
+    # and the file shipped as `known_sar_spill.jpg` -- documented as a ground-truth
+    # SAR scene with a confirmed slick -- is in fact digital artwork of a person's
+    # head. Every checkpoint that passed this gate was benchmarked against a drawing.
+    # A validation gate that does not validate its own fixtures validates nothing.
     cal_dir = getattr(settings, 'CALIBRATION_DIR', os.path.join(settings.BASE_DIR, 'calibration_data'))
-    cal_img_path = os.path.join(str(cal_dir), 'known_sar_spill.jpg')
     baseline_path = str(getattr(settings, 'MODEL_FALLBACK_CHECKPOINT', settings.DEFAULT_MODEL_CHECKPOINT))
 
+    from apps.detection.preprocessing import load_image, validate_sar_characteristics
+    import numpy as _np
+    from PIL import Image as _Image
+
+    cal_img_path = None
+    for candidate in ('synthetic_sar_calibration.png', 'known_sar_spill.jpg'):
+        path = os.path.join(str(cal_dir), candidate)
+        if not os.path.isfile(path):
+            continue
+        arr = _np.array(_Image.open(path).convert('RGB'))
+        is_sar, why = validate_sar_characteristics(arr)
+        if is_sar:
+            cal_img_path = path
+            print(f"   Calibration asset: {candidate} (verified SAR)")
+            break
+        print(f"   [SKIP] {candidate} is not admissible SAR imagery and cannot")
+        print(f"          calibrate anything: {why}")
+
+    if cal_img_path is None:
+        print("[FAIL] No admissible SAR calibration asset found.")
+        print("       Generate one with:")
+        print("         python ai_model/calibration_data/make_calibration_scene.py")
+        print("       or place a verified Sentinel-1 scene in ai_model/calibration_data/.")
+        return False
+
     if os.path.isfile(cal_img_path):
-        from apps.detection.preprocessing import load_image
         real_sar_img, _ = load_image(cal_img_path)
 
         # Run Baseline
