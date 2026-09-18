@@ -79,7 +79,20 @@ server {
         proxy_set_header X-Forwarded-Proto \$scheme;
     }
 
-    # ── Project 2: MoSPI PAIMANA (FastAPI Port 8001) ─────────────
+    # ── Project 2: MoSPI PAIMANA Next.js Frontend (Port 3001) ───
+    location /paimana {
+        proxy_pass http://127.0.0.1:3001;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host \$host;
+        proxy_cache_bypass \$http_upgrade;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+
+    # ── Project 2: MoSPI PAIMANA FastAPI Backend (Port 8001) ─────
     location /dashboard {
         proxy_pass http://127.0.0.1:8001/dashboard;
         proxy_set_header Host \$host;
@@ -99,28 +112,25 @@ server {
         proxy_set_header Host \$host;
     }
 
-    location /api/v1/predict/ {
-        proxy_pass http://127.0.0.1:8001/api/v1/predict/;
+    # PAIMANA API Endpoints (portfolio, predict, analytics, health)
+    location /api/v1/ {
+        proxy_pass http://127.0.0.1:8001/api/v1/;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$scheme;
     }
 
-    location /api/v1/portfolio/ {
-        proxy_pass http://127.0.0.1:8001/api/v1/portfolio/;
+    # MarSlick API Endpoints (runs, dossiers) - takes priority due to longer prefix
+    location /api/v1/pipeline/ {
+        proxy_pass http://127.0.0.1:8000/api/v1/pipeline/;
+        proxy_http_version 1.1;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$scheme;
-    }
-
-    location /api/v1/analytics/ {
-        proxy_pass http://127.0.0.1:8001/api/v1/analytics/;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_read_timeout 300s;
+        proxy_connect_timeout 300s;
     }
 }
 EOF
@@ -173,17 +183,33 @@ Environment=MARSLICK_API_KEY=marslick-demo-key-2026
 WantedBy=multi-user.target
 EOF
 
+# Rebuild prototype2 (PAIMANA) Next.js frontend if present
+P2_DIR="/home/${TARGET_USER}/prototype2_evinco"
+if [[ -d "${P2_DIR}" ]]; then
+    echo -e "\n${YELLOW}[Updating and building PAIMANA Next.js frontend for /paimana]...${NC}"
+    cd "${P2_DIR}"
+    sudo -u "$TARGET_USER" git pull || true
+    if [[ -d "${P2_DIR}/hackathon-frontend-starter" ]]; then
+        cd "${P2_DIR}/hackathon-frontend-starter"
+        sudo -u "$TARGET_USER" npm run build
+        systemctl restart paimana-frontend || true
+    fi
+    cd "${PROJECT_DIR}"
+fi
+
 systemctl daemon-reload
 systemctl restart marslick-backend
 systemctl restart marslick-frontend
+systemctl restart paimana-backend || true
 systemctl restart nginx
 
 # 5. Summary
 echo -e "\n${GREEN}==================================================================${NC}"
 echo -e "${GREEN}🎉 ALL SET! Both projects are live on standard HTTPS for judges!  ${NC}"
 echo -e "${GREEN}==================================================================${NC}"
-echo -e "\n  👉 Project 1 (MarSlick):      ${BLUE}https://${DOMAIN}/${NC}"
-echo -e "  👉 Project 2 (MoSPI PAIMANA): ${BLUE}https://${DOMAIN}/dashboard${NC}"
-echo -e "  👉 Project 2 Swagger Docs:    ${BLUE}https://${DOMAIN}/docs${NC}"
+echo -e "\n  👉 Project 1 (MarSlick Forensic):       ${BLUE}https://${DOMAIN}/${NC}"
+echo -e "  👉 Project 2 (MoSPI PAIMANA Next.js):   ${BLUE}https://${DOMAIN}/paimana${NC}"
+echo -e "  👉 Project 2 (Executive Command HTML):  ${BLUE}https://${DOMAIN}/dashboard${NC}"
+echo -e "  👉 Project 2 (API Swagger Docs):        ${BLUE}https://${DOMAIN}/docs${NC}"
 echo -e "\nBoth projects work seamlessly on mobile phones (4G/5G/Wi-Fi) with valid SSL!"
 echo -e "${GREEN}==================================================================${NC}\n"
