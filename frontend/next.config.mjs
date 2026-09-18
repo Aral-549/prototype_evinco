@@ -4,7 +4,7 @@ const nextConfig = {
   async rewrites() {
     // Proxy API and media through the Next dev server so the browser makes
     // same-origin requests and CORS never enters the picture during a demo.
-    const backend = process.env.BACKEND_ORIGIN || "http://localhost:8000";
+    const backend = process.env.BACKEND_ORIGIN || "http://127.0.0.1:8000";
     return [
       { source: "/api/:path*", destination: `${backend}/api/:path*` },
       { source: "/media/:path*", destination: `${backend}/media/:path*` },

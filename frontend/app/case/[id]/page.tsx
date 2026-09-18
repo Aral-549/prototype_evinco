@@ -34,30 +34,30 @@ export default async function CasePage({
   try {
     dossier = await getDossier(id);
   } catch (e) {
-    // A 404 is a missing case; anything else is an infrastructure problem and
-    // should say so rather than masquerading as "no such case".
+    // A 404 is a missing case; anything else (connection refused, 500, fetch failed)
+    // is an infrastructure problem and should say so rather than masquerading as 404.
     const status = (e as { status?: number })?.status;
-    if (status && status !== 404) {
-      return (
-        <>
-          <NoiseOverlay />
-          <Nav />
-          <main className="mx-auto flex w-full max-w-[1180px] flex-1 flex-col items-center justify-center gap-3 px-6 py-32 text-center">
-            <div className="label text-danger">Backend unreachable</div>
-            <h1 className="font-[family-name:var(--font-display)] text-2xl font-semibold tracking-tight">
-              Could not load this case
-            </h1>
-            <p className="max-w-md text-[13px] leading-relaxed text-fg-muted">
-              {(e as Error).message}
-            </p>
-            <p className="max-w-md text-[12px] text-fg-dim">
-              Check that the Django server is running on port 8000.
-            </p>
-          </main>
-        </>
-      );
+    if (status === 404) {
+      notFound();
     }
-    notFound();
+    return (
+      <>
+        <NoiseOverlay />
+        <Nav />
+        <main className="mx-auto flex w-full max-w-[1180px] flex-1 flex-col items-center justify-center gap-3 px-6 py-32 text-center">
+          <div className="label text-danger">Backend unreachable</div>
+          <h1 className="font-[family-name:var(--font-display)] text-2xl font-semibold tracking-tight">
+            Could not load this case
+          </h1>
+          <p className="max-w-md text-[13px] leading-relaxed text-fg-muted">
+            {(e as Error).message || "Unable to reach the Django backend API."}
+          </p>
+          <p className="max-w-md text-[12px] text-fg-dim">
+            Check that the Django server is running on port 8000.
+          </p>
+        </main>
+      </>
+    );
   }
 
   const { run, model } = dossier;

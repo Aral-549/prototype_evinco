@@ -32,7 +32,7 @@ function authHeaders(): Record<string, string> {
 }
 
 export const API_BASE = isServer
-  ? (process.env.BACKEND_ORIGIN ?? "http://localhost:8000")
+  ? (process.env.BACKEND_ORIGIN ?? "http://127.0.0.1:8000")
   // Browser-side: route through /api/proxy, which runs in the Next process and
   // attaches the key there. A key shipped to the browser is not a secret.
   : "/api/proxy";

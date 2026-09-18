@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
  * runs in the Next process, attaches the key from a server-only env var, and
  * forwards to Django. The credential never crosses the network to the user.
  */
-const BACKEND = process.env.BACKEND_ORIGIN ?? "http://localhost:8000";
+const BACKEND = process.env.BACKEND_ORIGIN ?? "http://127.0.0.1:8000";
 
 async function forward(request: NextRequest, path: string[]) {
   const target = `${BACKEND}/api/${path.join("/")}${request.nextUrl.search}`;
