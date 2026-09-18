@@ -1,15 +1,6 @@
 version: '3.8'
 
 services:
-  redis:
-    image: redis:7-alpine
-    container_name: marslick-redis
-    ports:
-      - "6379:6379"
-    restart: unless-stopped
-    volumes:
-      - redis_data:/data
-
   backend:
     build:
       context: .
@@ -24,31 +15,4 @@ services:
       - "8000:8000"
     environment:
       - DEBUG=True
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/1
-      - REDIS_CACHE_URL=redis://redis:6379/2
-    depends_on:
-      - redis
     restart: unless-stopped
-
-  celery_worker:
-    build:
-      context: .
-      dockerfile: backend/Dockerfile
-    container_name: marslick-celery
-    command: celery -A config worker -Q detection_queue,drift_queue,ais_queue,default -c 2 -l INFO
-    volumes:
-      - ./backend:/app/backend
-      - ./frontend:/app/frontend
-      - ./ai_model:/app/ai_model
-    environment:
-      - DEBUG=True
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/1
-      - REDIS_CACHE_URL=redis://redis:6379/2
-    depends_on:
-      - redis
-    restart: unless-stopped
-
-volumes:
-  redis_data:

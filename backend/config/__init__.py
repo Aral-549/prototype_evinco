@@ -1,3 +1,1 @@
-from .celery import app as celery_app
-
-__all__ = ('celery_app',)
+# config/__init__.py  (was: imported Celery app — no longer needed)

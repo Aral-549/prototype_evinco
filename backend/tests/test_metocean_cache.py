@@ -5,7 +5,7 @@ from apps.drift.metocean import fetch_metocean_vectors
 
 
 def test_metocean_caching():
-    """Unit Test: Open-Meteo fetching sets and retrieves from Redis cache."""
+    """Unit Test: Open-Meteo fetching sets and retrieves from the in-process cache."""
     lat, lon = 18.95, 72.10
     now = datetime(2026, 9, 5, 1, 0, tzinfo=timezone.utc)
 
@@ -22,8 +22,8 @@ def test_metocean_caching():
 
     # Manually modify cache to prove second fetch hits cache
     cached_payload = dict(res1)
-    cached_payload['source'] = 'verified_from_redis_cache'
+    cached_payload['source'] = 'verified_from_locmem_cache'
     cache.set(cache_key, cached_payload, timeout=300)
 
     res2 = fetch_metocean_vectors(lat, lon, now)
-    assert res2['source'] == 'verified_from_redis_cache'
+    assert res2['source'] == 'verified_from_locmem_cache'

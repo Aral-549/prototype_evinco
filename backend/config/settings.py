@@ -164,39 +164,19 @@ SPECTACULAR_SETTINGS = {
     'SERVE_INCLUDE_SCHEMA': False,
 }
 
-# ── Celery Broker & Task Queue Settings ─────────────────────────
-CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'redis://localhost:6379/0')
-CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', 'redis://localhost:6379/1')
-CELERY_ACCEPT_CONTENT = ['json']
-CELERY_TASK_SERIALIZER = 'json'
-CELERY_RESULT_SERIALIZER = 'json'
-CELERY_TIMEZONE = TIME_ZONE
-CELERY_TASK_TRACK_STARTED = True
-CELERY_TASK_ROUTES = {
-    'apps.detection.tasks.*': {'queue': 'detection_queue'},
-    'apps.drift.tasks.*': {'queue': 'drift_queue'},
-    'apps.ais.tasks.*': {'queue': 'ais_queue'},
-    'apps.pipeline.tasks.*': {'queue': 'default'},
+# ── Cache Settings ─────────────────────────────────────────────
+# In-process locmem cache — no external service required.
+# Metocean API responses are cached here for 30 min; they are
+# automatically evicted when the process restarts, which is fine
+# for a development/demo server. Add a persistent backend (e.g.
+# diskcache or filesystem) if you need the cache to survive restarts.
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'marslick-cache',
+    }
 }
 
-# ── Cache Settings ─────────────────────────────────────────────
-# Redis in development and production. Under pytest (or when CACHE_BACKEND=locmem)
-# fall back to Django's in-process cache so the suite is hermetic: a judge cloning
-# this repository must be able to run `pytest` with no external services running.
-if RUNNING_TESTS:
-    CACHES = {
-        'default': {
-            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-            'LOCATION': 'marslick-test-cache',
-        }
-    }
-else:
-    CACHES = {
-        'default': {
-            'BACKEND': 'django.core.cache.backends.redis.RedisCache',
-            'LOCATION': os.getenv('REDIS_CACHE_URL', 'redis://localhost:6379/2'),
-        }
-    }
 
 # ── Structured Logging Configuration ───────────────────────────
 LOGGING = {

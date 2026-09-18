@@ -4,9 +4,7 @@ djangorestframework>=3.15
 drf-spectacular>=0.27
 django-cors-headers>=4.3
 
-# Asynchronous Task Processing & Caching
-celery>=5.3
-redis>=5.0
+# Caching (in-process)
 
 # Computer Vision & Geospatial
 Pillow>=10.0

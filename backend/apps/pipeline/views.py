@@ -64,29 +64,11 @@ class PipelineRunView(APIView):
         if all(k in data and data[k] is not None for k in ('bbox_min_lon', 'bbox_min_lat', 'bbox_max_lon', 'bbox_max_lat')):
             user_bbox = (data['bbox_min_lon'], data['bbox_min_lat'], data['bbox_max_lon'], data['bbox_max_lat'])
 
-        # Check if synchronous execution explicitly requested or needed as fallback
-        is_sync = request.query_params.get('sync', 'false').lower() == 'true'
-
-        if not is_sync:
-            try:
-                from config.celery import app as celery_app
-                # Check for active workers with a quick 200ms ping
-                pings = celery_app.control.ping(timeout=0.25)
-                if pings:
-                    from .tasks import launch_pipeline_chain
-                    launch_pipeline_chain(str(pipeline_run.id))
-                    return Response(
-                        PipelineRunSerializer(pipeline_run).data,
-                        status=status.HTTP_202_ACCEPTED
-                    )
-            except Exception:
-                # Redis unreachable or no workers available -> fall through to synchronous mode
-                pass
-
-        # Synchronous execution (either explicitly requested, or as reliable fallback when Celery worker is offline)
+        # Synchronous execution — pipeline completes before the response is returned.
+        # The full run takes 2-10 s on CPU; the frontend shows a loading state.
         try:
             run_pipeline(pipeline_run, image_path, detection_time=detection_time, user_bbox=user_bbox)
-        except Exception as e:
+        except Exception:
             import traceback
             traceback.print_exc()
 
