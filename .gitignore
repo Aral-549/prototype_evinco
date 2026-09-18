@@ -13,8 +13,8 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
+/lib/
+/lib64/
 parts/
 sdist/
 var/
@@ -54,3 +54,17 @@ ai_model/weights/**/best_unet
 *.swo
 .DS_Store
 Thumbs.db
+
+# Frontend (Next.js)
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/.env*.local
+hackathon-frontend-starter/node_modules/
+hackathon-frontend-starter/.next/
+hackathon-frontend-starter/out/
+hackathon-frontend-starter/.env*.local
+*.tsbuildinfo
+
+# Raw unstripped checkpoint directory (only stripped .pt in weights/ is tracked)
+best_segformer_b0.pth/

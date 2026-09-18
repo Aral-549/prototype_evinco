@@ -47,7 +47,7 @@ The repository is modularly organized into independent subsystems so that backen
 │   └── README.md                 # Frontend developer guide
 ├── ai_model/                     # Neural Network Weights, Checkpoints & Validation
 │   ├── weights/                  # Active U-Net checkpoint (.pt / .pth) & model_info.json
-│   ├── calibration_data/         # Real SAR calibration imagery (known_sar_spill.jpg)
+│   ├── calibration_data/         # SAR calibration scene + ground-truth mask (see its README)
 │   ├── scripts/                  # 6-step validation gate & side-by-side behavioral benchmark
 │   └── README.md                 # ML engineer guide
 ├── docs/                         # Official presentations, guidelines, and architecture diagrams
@@ -127,9 +127,25 @@ The repository is modularly organized into independent subsystems so that backen
 
 ---
 
-## 5. What Is Already Done and Working (13/13 Tests Passing)
+## 5. What Is Already Done and Working (142 tests passing, 2 flagged for review)
 
-All core backend logic, physics calculations, AI model inference, and REST APIs have been built, verified, and tested with **13 out of 13 automated tests passing**.
+All core backend logic, physics calculations, AI model inference, and REST APIs have been
+built, verified, and tested. The suite is **hermetic**: it needs no Redis, no Postgres and no
+network, so a judge can clone the repository and reproduce the result directly.
+
+```
+142 passed, 2 xfailed
+```
+
+The two `xfailed` cases are golden tests whose fixtures use additive Gaussian noise, which
+SAR does not obey; they are preserved verbatim and flagged for human adjudication rather
+than rewritten. See `BUGLOG.md`.
+
+Nineteen defects found and fixed during hardening are documented in `BUGLOG.md`, each with a
+permanent regression case in `backend/tests/golden/`. The most serious: the file shipped as
+the project's *"ground-truth SAR calibration image"* is digital artwork, it passed the SAR
+domain gate, and the model hot-swap validation had been benchmarking every checkpoint
+against it.
 
 | Subsystem | Folder Location | What Is Completed |
 |---|---|---|
@@ -148,6 +164,167 @@ pytest
 ```
 
 ---
+
+---
+
+## 5b. Forensic Hardening (What Makes This Defensible)
+
+Detection alone is a demo. These four additions are what make the output usable as
+evidence rather than as an assertion.
+
+### Layer 2: oil vs look-alike discrimination
+A U-Net trained on spill masks learns "dark region on water", which is not a definition of
+oil. Calm-wind zones, biogenic slicks, rain cells and wind shadows are all dark too, and
+they are the dominant false-positive source in operational SAR monitoring.
+
+`apps/detection/lookalike.py` scores each candidate on physical discriminators and reports
+the per-feature log-odds, so the dossier states *why* a region was accepted:
+
+| Discriminator | What it separates |
+|---|---|
+| Backscatter damping | Oil suppresses capillary waves; necessary, but a calm zone is equally dark |
+| **Speckle damping (CV ratio)** | **The decisive one.** Oil damps the speckle *texture*; a calm zone is darker with speckle untouched |
+| Edge definition | Oil has a surface-tension boundary; calm zones grade smoothly |
+| Elongation | Ship discharges are linear along track; calm zones are blobs |
+| Wind plausibility | Below ~3 m/s there is nothing to damp; above ~12 m/s oil disperses. Applied as a penalty only |
+
+On a controlled scene with a true slick and a calm-zone decoy of identical darkness, this
+separates them **0.985 to 0.063**.
+
+### Monte Carlo drift ensemble
+Five hundred particles advected backward through an **hourly** met-ocean field, each drawing
+its own wind, current, windage factor and drift duration, with hemisphere-correct
+Coriolis/Ekman deflection. The output is a probability distribution over the release point —
+50% and 90% confidence hulls — with uncertainty **measured from the ensemble's own spread**
+rather than the placeholder `2.0 + 0.5 x duration` the first prototype asserted.
+
+### Bayesian attribution with an explicit "unknown vessel"
+The old score was `0.40*proximity + 0.35*temporal + 0.25*behavioural`, where the proximity
+and temporal minima could come from different AIS reports — so a vessel 1 km away *forty
+hours early* scored near a genuine match.
+
+`apps/ais/attribution.py` instead asks the question a court asks: for each ensemble member's
+(release point, release time), was this vessel there? The share of members it captures is a
+likelihood that is **joint in space and time by construction**. Anomalies enter as a
+multiplicative likelihood ratio, never additively — a transponder blackout raises the odds
+for a vessel already placed at the scene, and multiplying a zero likelihood by any factor
+still leaves zero.
+
+An explicit **unknown-vessel hypothesis** holds prior mass for dark vessels, coverage gaps
+and spoofed identities, so the system reports *insufficient evidence* rather than promoting
+the least-bad candidate. Both paths are exercised end to end on real input.
+
+### Two-model ensemble, selected on evidence
+The repository ships two checkpoints. Their reported validation metrics favour
+SegFormer-B0 (Dice 0.8245 vs 0.8018) and it runs 9x faster at 8x fewer parameters —
+but it could not be loaded at all: its custom key layout matched no architecture in
+the repo, so the fail-safe silently served the old U-Net.
+
+With the architecture reconstructed, an 11-scene benchmark
+(`ai_model/scripts/benchmark_models.py`) shows neither model dominates:
+
+| scene | U-Net | SegFormer | **Ensemble** |
+|---|---|---|---|
+| linear_noisy | 0.578 | 0.931 | **0.958** |
+| blob_clear | 0.994 | 0.000 | **0.990** |
+| patchy_clear | 0.977 | 0.266 | 0.771 |
+| **mean effective Dice** | 0.590 | 0.401 | **0.613** |
+| clean-water false alerts | 0/3 | 0/3 | **0/3** |
+
+Averaging the posteriors inherits whichever member was right instead of splitting the
+difference, and needs no tuning — which matters, because the benchmark is synthetic
+and a fitted threshold would not transfer. The ensemble is the default; set
+`MODEL_ENSEMBLE=off` to run a single checkpoint.
+
+Two things measured and rejected along the way: **test-time augmentation hurts**
+(Dice 0.575 -> 0.506, recall 0.962 -> 0.801) because SAR's cross-swath incidence
+gradient makes a flipped tile an input the model never saw; and **both models miss
+faint slicks entirely** (0.000 Dice at ~2x damping), which is a training-data gap and
+the largest accuracy limitation remaining.
+
+### Adversarial self-audit: we try to break our own conclusion
+A posterior is conditional on assumptions nobody measured — that the slick drifted for
+24 hours, that windage is 3%, that the met-ocean model was right. `apps/ais/robustness.py`
+re-runs the attribution across 32 assumption sets drawn from ranges a domain expert
+would accept, and reports:
+
+- **stability** — how often the same vessel still comes first
+- **the breaking point** — the smallest defensible change that flips it
+- **which assumption decides it** — the quantity worth measuring first
+- **AIS integrity** — whether the track is even physically self-consistent
+  (impossible speeds, position teleports, speed contradicting position)
+
+On the bundled demo this matters: the system names a vessel at **73% posterior on
+strong evidence**, then reports that the finding survives only **19%** of plausible
+assumption sets and hinges on the Ekman deflection angle. A conclusion that fragile is
+a lead, not an attribution, and the dossier says so in its own voice. Runs inline in
+~140 ms.
+
+### The model's own attack surface, audited
+Detection models are usually shipped without anyone asking how they break on purpose.
+Two classes of finding, both reproduced by construction:
+
+**Arbitrary code execution on checkpoint load (fixed, critical).** A PyTorch
+checkpoint is a pickle, and unpickling executes code. A 2 KB file advertising
+`val_dice: 0.99` ran a shell command during load — before any architecture or
+shape check could reject it. That is the ordinary ML supply chain: checkpoints get
+downloaded from model zoos and dropped into `ai_model/weights/` exactly as this
+project's own hot-swap instructions describe. Both load paths now parse checkpoints
+as data (`weights_only=True`, plus a restricted unpickler whose allowlist holds only
+the globals a state dict legitimately needs).
+
+**Adversarial perturbation (one direction mitigated, one documented).** Bounded PGD
+flips the segmentation head both ways:
+
+| attack | perturbation | effect | outcome |
+|---|---|---|---|
+| Evasion — hide a real slick | **1/255** (invisible) | 16,687 px → **0** | **not mitigated** |
+| Injection — frame a vessel | 8/255 | 0 → **18,459 px** of "oil" on clean water | **blocked at `p_oil = 0.010`** |
+
+Injection is blocked because the Layer 2 screen measures speckle damping *from the
+image*, not from the network. Gradient descent can move the pixels a CNN reads; it
+cannot reproduce the radar physics mineral oil actually causes. Evasion is not
+blocked, and cannot be by this mechanism — a screen that only removes candidates can
+never recover one that was never detected. For a forensic tool that asymmetry is the
+right way round, but it is a real limit and is stated rather than papered over.
+
+Three candidate hardenings were measured and **rejected on evidence**, which is why
+the default is unchanged:
+
+- `MODEL_COMBINER=max` resists evasion (an attacker must defeat every member) but
+  effective Dice falls 0.613 → 0.369.
+- Median purification defeats the attack (Dice 0.000 → 0.552) but **destroys the
+  speckle statistic both physics layers depend on** — local CV 0.251 → 0.056, and at
+  5×5 the scene no longer passes the SAR domain gate at all.
+- Member disagreement as an attack detector: 17.85% under attack vs 16.34% on a
+  legitimately noisy scene. A 1.1× separation is not a detector.
+
+One finding worth its own line: a PGD attack on SegFormer alone **did not transfer** —
+the U-Net still detected 11,700 px — yet the ensemble still output 0, because
+mean-combining a confident 0 with a confident 1 lands exactly on the decision
+boundary. **A single attacked member can veto a correct one.**
+
+### Chain of custody
+Every run is sealed with SHA-256 digests over the input scene, the model weights, the code
+commit, every parameter and the RNG seed, plus the provenance of each met-ocean sample. Same
+inputs and seed reproduce the same digest; an altered dossier fails `verify()`. These are
+integrity digests, not signatures — non-repudiation needs an authority-held key, which is
+stated as out of scope rather than glossed over.
+
+---
+
+## 5c. Running the Console
+
+```bash
+# Terminal 1 — API
+source .venv/bin/activate && cd backend && python manage.py runserver 8000
+
+# Terminal 2 — console
+cd frontend && npm install && npm run dev
+```
+
+Open http://localhost:3000. The Next.js console proxies `/api` and `/media` to Django, so
+CORS never enters the picture during a demo.
 
 ## 6. What Needs To Be Done (Team Action Plan)
 
