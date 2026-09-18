@@ -34,6 +34,15 @@ class SpillRegion(models.Model):
     centroid_lon = models.FloatField(null=True, blank=True)
     area_sq_km = models.FloatField(null=True, blank=True)
     confidence = models.FloatField()
+    # Layer 2 safeguard: physics-informed oil-vs-lookalike discrimination.
+    oil_probability = models.FloatField(null=True, blank=True)
+    lookalike_verdict = models.CharField(max_length=32, blank=True, default='')
+    lookalike_features = models.JSONField(default=dict, blank=True)
+    lookalike_contributions = models.JSONField(default=dict, blank=True)
+    lookalike_notes = models.JSONField(default=list, blank=True)
+    # Bonn Agreement volume band (a range, never a point estimate).
+    volume_estimate = models.JSONField(default=dict, blank=True)
+    shape_complexity = models.FloatField(null=True, blank=True)
 
     def __str__(self):
         return f'SpillRegion {self.id} (job={self.job_id}, conf={self.confidence:.2f})'

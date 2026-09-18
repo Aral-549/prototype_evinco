@@ -11,5 +11,7 @@
   "normalization": "scale_0_1",
   "threshold": 0.5,
   "training_dataset": "Sentinel-1 SAR Marine Oil Spills",
-  "date": "2026-09-04"
+  "date": "2026-09-04",
+  "output_activation": "logits",
+  "output_activation_source": "Verified by probing the checkpoint: raw outputs fall outside [0,1] on zero, one and negative-constant inputs. Declared explicitly so inference never has to guess -- output-range inspection cannot distinguish a sigmoid head from a logit head whose values happen to be confined to [0,1]."
 }

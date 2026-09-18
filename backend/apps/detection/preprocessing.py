@@ -3,6 +3,45 @@ import numpy as np
 from PIL import Image
 
 
+def speckle_statistics(gray: np.ndarray, window: int = 9) -> dict:
+    """Local coefficient-of-variation statistics, the fingerprint of SAR speckle.
+
+    SAR is a coherent imaging system, so every resolution cell carries multiplicative
+    speckle noise. For an L-look intensity image the local coefficient of variation
+    (sigma/mu over a small window) sits near 1/sqrt(L) EVERYWHERE, including inside
+    dark regions -- a calm sea or an oil slick is darker but still speckled. Smooth,
+    locally-flat areas are therefore not something SAR produces.
+
+    Incoherent imagery -- an optical photo, a rendering, a painting, a screenshot --
+    has large regions of smoothly varying intensity and a local CV close to zero
+    across much of the frame.
+
+    This is the signature the original gate never tested. It checked only channel
+    correlation and zero-variance blocks, both of which a near-greyscale artwork
+    satisfies, which is how a piece of digital art shipped as this project's
+    "ground-truth SAR calibration image" passed as genuine SAR.
+    """
+    from scipy import ndimage
+
+    g = gray.astype(np.float32)
+    mean = ndimage.uniform_filter(g, window)
+    mean_sq = ndimage.uniform_filter(g * g, window)
+    variance = np.maximum(mean_sq - mean * mean, 0.0)
+    cv = np.sqrt(variance) / np.maximum(mean, 1e-6)
+
+    # Ignore near-black cells, where CV is dominated by quantisation rather than speckle.
+    valid = mean > (0.02 * 255.0)
+    if valid.sum() < 64:
+        return {'median_cv': 0.0, 'smooth_fraction': 1.0, 'valid_fraction': 0.0}
+
+    cv_valid = cv[valid]
+    return {
+        'median_cv': float(np.median(cv_valid)),
+        'smooth_fraction': float((cv_valid < 0.05).mean()),
+        'valid_fraction': float(valid.mean()),
+    }
+
+
 def validate_sar_characteristics(rgb_arr: np.ndarray) -> tuple[bool, str]:
     """Validate whether an image exhibits the statistical physical signatures of SAR imagery
 
@@ -59,11 +98,23 @@ def validate_sar_characteristics(rgb_arr: np.ndarray) -> tuple[bool, str]:
     is_flat_synthetic = flat_ratio > 0.30
     is_mostly_flat = flat_ratio > 0.50
 
+    # Signal 3: speckle. A coherent radar image is speckled everywhere; an
+    # incoherent one (photo, render, painting, screenshot) is locally smooth over
+    # much of the frame. Thresholds are set well clear of despeckled or
+    # JPEG-compressed SAR, which still retains far more local variation than any
+    # incoherent image.
+    speckle = speckle_statistics(gray)
+    lacks_speckle = (
+        speckle['median_cv'] < 0.18 and speckle['smooth_fraction'] > 0.15
+    )
+
     # Decision rule:
     # 1. Optical photo / colored meme / UI with colored text -> is_strongly_decorrelated -> REJECT
     # 2. Both signals disagree: color decorrelation AND flat synthetic blocks -> REJECT
     # 3. Patch variance is completely zero across large regions (>50% flat computer blocks, e.g. text/docs) -> REJECT
-    if is_strongly_decorrelated or (is_decorrelated and is_flat_synthetic) or is_mostly_flat:
+    # 4. No speckle -> not a coherent radar image at all, whatever its colour statistics
+    if (is_strongly_decorrelated or (is_decorrelated and is_flat_synthetic)
+            or is_mostly_flat or lacks_speckle):
         reasons = []
         if is_strongly_decorrelated or is_decorrelated:
             reasons.append(f'channel decorrelation ({min_corr:.3f} < 0.98)')
@@ -71,9 +122,19 @@ def validate_sar_characteristics(rgb_arr: np.ndarray) -> tuple[bool, str]:
             reasons.append(f'unnatural zero-variance flat blocks ({flat_ratio*100:.1f}% > 50%)')
         elif is_flat_synthetic:
             reasons.append(f'unnatural zero-variance flat blocks ({flat_ratio*100:.1f}% > 30%)')
+        if lacks_speckle:
+            reasons.append(
+                f"absent speckle (median local CV {speckle['median_cv']:.3f}, "
+                f"{speckle['smooth_fraction']*100:.0f}% of the scene locally smooth) -- "
+                f"a coherent radar image is speckled everywhere, including inside dark "
+                f"regions"
+            )
         return False, f"OOD Rejection: Input image does not exhibit SAR backscatter signatures [{', '.join(reasons)}]."
 
-    return True, f'Passed SAR verification (min_corr={min_corr:.3f}, flat_ratio={flat_ratio*100:.1f}%)'
+    return (True,
+            f'Passed SAR verification (min_corr={min_corr:.3f}, '
+            f'flat_ratio={flat_ratio*100:.1f}%, '
+            f"median_cv={speckle['median_cv']:.3f})")
 
 
 def extract_geotiff_bbox(img: Image.Image) -> tuple | None:

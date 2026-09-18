@@ -1,0 +1,20 @@
+{
+  "name": "SegFormer-B0 (MiT-B0 encoder, all-MLP decoder)",
+  "version": "1.0.0",
+  "architecture": "segformer_b0",
+  "checkpoint_id": "best_segformer_b0",
+  "dice_score": 0.8245,
+  "iou_score": 0.7294,
+  "precision": 0.8461,
+  "recall": 0.8511,
+  "trained_epochs": 9,
+  "input_channels": 3,
+  "input_size": 256,
+  "stride": 224,
+  "normalization": "scale_0_1",
+  "threshold": 0.5,
+  "output_activation": "logits",
+  "output_activation_source": "Verified by probing: outputs fall outside [0,1] on constant inputs.",
+  "parameters": 3714914,
+  "notes": "Optimizer state stripped from the training checkpoint (45 MB -> 15 MB); only the weights that affect a prediction are retained, so the chain-of-custody digest covers exactly what produced the result. Reported metrics are the values embedded in the training checkpoint at epoch 9 and describe that training run's own validation split; they are NOT directly comparable with the U-Net's figures unless both were evaluated on the same split."
+}
