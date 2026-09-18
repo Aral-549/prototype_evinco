@@ -92,19 +92,20 @@ server {
         proxy_set_header X-Forwarded-Proto \$scheme;
     }
 
-    # ── Project 2: MoSPI PAIMANA Platform (FastAPI Port 8001) ─────
-    location = /paimana {
-        return 301 /paimana/;
-    }
-
-    location /paimana/ {
-        proxy_pass http://127.0.0.1:8001/dashboard;
+    # ── Project 2: MoSPI PAIMANA Next.js Frontend (Port 3001) ───
+    location /paimana {
+        proxy_pass http://127.0.0.1:3001;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection 'upgrade';
         proxy_set_header Host \$host;
+        proxy_cache_bypass \$http_upgrade;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$scheme;
     }
 
+    # ── Project 2: MoSPI PAIMANA FastAPI Backend (Port 8001) ─────
     location /dashboard {
         proxy_pass http://127.0.0.1:8001/dashboard;
         proxy_set_header Host \$host;
@@ -195,10 +196,38 @@ Environment=MARSLICK_API_KEY=marslick-demo-key-2026
 WantedBy=multi-user.target
 EOF
 
-# Stop and disable paimana-frontend if it was installed previously
-if systemctl is-active --quiet paimana-frontend; then
-    systemctl stop paimana-frontend || true
-    systemctl disable paimana-frontend || true
+# 4b. Rebuild and configure PAIMANA Next.js frontend (port 3001)
+P2_DIR="/home/${TARGET_USER}/prototype2_evinco"
+if [[ -d "${P2_DIR}/hackathon-frontend-starter" ]]; then
+    echo -e "\n${YELLOW}[Building PAIMANA Next.js frontend for /paimana]...${NC}"
+    cd "${P2_DIR}"
+    sudo -u "$TARGET_USER" git pull || true
+    cd "${P2_DIR}/hackathon-frontend-starter"
+    sudo -u "$TARGET_USER" npm install || true
+    sudo -u "$TARGET_USER" npm run build
+    
+    cat <<EOF > /etc/systemd/system/paimana-frontend.service
+[Unit]
+Description=PAIMANA Next.js Frontend Service
+After=network.target
+
+[Service]
+User=${TARGET_USER}
+Group=${TARGET_USER}
+WorkingDirectory=${P2_DIR}/hackathon-frontend-starter
+ExecStart=$(which npm) start -- -p 3001
+Restart=always
+RestartSec=5
+Environment=NODE_ENV=production
+Environment=PORT=3001
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    systemctl daemon-reload
+    systemctl enable paimana-frontend
+    systemctl restart paimana-frontend
+    cd "${PROJECT_DIR}"
 fi
 
 systemctl daemon-reload
