@@ -233,4 +233,3 @@ prototype_evinco/
 * **Project:** MarSlick (PS 26143)
 * **Team Name:** Evinco
 * **Live Online Demo:** [https://evinco-sih.centralindia.cloudapp.azure.com/](https://evinco-sih.centralindia.cloudapp.azure.com/)
-* **Contact Email:** `shaik2.mitmpl2025@learner.manipal.edu`
